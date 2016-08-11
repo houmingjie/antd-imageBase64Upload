@@ -3,19 +3,43 @@
  * props:maxSize:最大大小,单位：字节
  */
 import React, { Component, PropTypes } from 'react';
-import {Upload,Row, Col, Form, Modal, Input, Spin,Radio,Button,Icon,message} from 'antd';
+import {Upload,Button,message} from 'antd';
 
 export default class ImageBase64 extends Component {
 
-    constructor(props) {
-        super(props);
-        this.state = {
-            fileList:[],
-        };
+    static propTypes = {
+        maxSize: React.PropTypes.number,//单位：字节
+        maxHeight:React.PropTypes.number,//单位：像素
+        maxWidth:React.PropTypes.number,
+        minHeight:React.PropTypes.number,
+        minWidth:React.PropTypes.number,
+        exactHeight:React.PropTypes.number,
+        exactWidth:React.PropTypes.number,
+        ratio:React.PropTypes.number,//长宽比
     }
 
     name="图片";
     uid=-1;
+
+    constructor(props) {
+        super(props);
+
+        if(props.value){
+            this.state = {
+                fileList:[{
+                    uid: this.uid,
+                    name: this.name,
+                    status: 'done',
+                    url: props.value,
+                }],
+            };
+        }
+        else{
+            this.state = {
+                fileList:[],
+            }
+        }
+    }
 
     componentWillReceiveProps(newProp){//清空表单域时清空图片列表
 
@@ -50,22 +74,80 @@ export default class ImageBase64 extends Component {
                     this.props.onChange({target:{value:oldFileUrl}});
                     return false;
                 }
-                this.name = file.name;
-                this.uid = file.uid;
+                if(file.type=="image/gif"){
+                    message.destroy();
+                    message.error("不支持gif");//TODO 用antd原生的错误提示
+                    this.props.onChange({target:{value:oldFileUrl}});
+                    return false;
+                }
             }
-
 
             reader.onloadstart = () => {
                 this.props.onChange({target:{value:""}});
             }
 
             reader.onload = () => {
+                var image = new Image();
+                image.src = reader.result;
+
+                var isImageValid = true;
+
+                if(this.props.ratio&&(image.width/image.height)!= this.props.ratio){
+                    message.destroy();
+                    message.error("长宽比错误，应为"+this.props.ratio);//TODO 用antd原生的错误提示
+                    this.props.onChange({target:{value:oldFileUrl}});
+                    isImageValid = false;
+                }
+
+                if(this.props.minHeight>image.height){
+                    message.destroy();
+                    message.error("尺寸错误：高度不得小于"+this.props.minHeight);//TODO 用antd原生的错误提示
+                    this.props.onChange({target:{value:oldFileUrl}});
+                    isImageValid = false;
+                }
+                if(this.props.maxHeight<image.height){
+                    message.destroy();
+                    message.error("尺寸错误：高度不得大于"+this.props.maxHeight);//TODO 用antd原生的错误提示
+                    this.props.onChange({target:{value:oldFileUrl}});
+                    isImageValid = false;
+                }
+
+                if(this.props.minWidth>image.width){
+                    message.destroy();
+                    message.error("尺寸错误：宽度不得小于"+this.props.minWidth);//TODO 用antd原生的错误提示
+                    this.props.onChange({target:{value:oldFileUrl}});
+                    isImageValid = false;
+                }
+                if(this.props.maxWidth<image.width){
+                    message.destroy();
+                    message.error("尺寸错误：宽度不得大于"+this.props.minWidth);//TODO 用antd原生的错误提示
+                    this.props.onChange({target:{value:oldFileUrl}});
+                    isImageValid = false;
+                }
+
+                if(this.props.exactHeight&&this.props.exactHeight!=image.height){
+                    message.destroy();
+                    message.error("尺寸错误：高度为"+this.props.exactHeight);//TODO 用antd原生的错误提示
+                    this.props.onChange({target:{value:oldFileUrl}});
+                    isImageValid = false;
+                }
+                if(this.props.exactWidth&&this.props.exactWidth!=image.width){
+                    message.destroy();
+                    message.error("尺寸错误：宽度为"+this.props.exactWidth);//TODO 用antd原生的错误提示
+                    this.props.onChange({target:{value:oldFileUrl}});
+                    isImageValid = false;
+                }
+
                 if(reader.result.indexOf("data:image/")<0){
                     message.destroy();
                     message.error("素材格式错误");//TODO 用antd原生的错误提示
                     this.props.onChange({target:{value:oldFileUrl}});
+                    isImageValid = false;
                 }
-                else{
+
+                if(isImageValid){
+                    this.name = file.name;
+                    this.uid = file.uid;
                     this.props.onChange({target:{value:reader.result}});//模拟从event中获取value，通过这种方式将value传给form
                 }
             }
